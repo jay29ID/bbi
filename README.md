@@ -29,6 +29,7 @@ APP_PASSWORD=choose-one SESSION_SECRET=some-long-random-string npm start
 - `server.js`: HTTP server and JSON API, SQLite storage for designs, sales and images
 - `public/index.html`: the whole phone app (no build step)
 - `public/sw.js`: service worker for offline use
+- `seed/designs.json`: starting merch list (from the Square export), loaded only when the database is empty
 
 ## API
 

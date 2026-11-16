@@ -91,6 +91,15 @@ function applyItems(items, sign) {
   for (const d of touched.values()) { d.updatedAt = Date.now(); putDesign(d); }
 }
 
+// First start with an empty database: load the starting merch list from seed/designs.json.
+(function seed() {
+  const file = path.join(__dirname, 'seed', 'designs.json');
+  if (db.prepare('SELECT COUNT(*) AS n FROM designs').get().n > 0 || !fs.existsSync(file)) return;
+  const list = JSON.parse(fs.readFileSync(file, 'utf8'));
+  tx(() => { for (const d of list) if (ID_RE.test(d.id)) putDesign(cleanDesign(d.id, d, null)); });
+  console.log(`Loaded ${list.length} designs from seed/designs.json`);
+})();
+
 /* ---------- Sessions ---------- */
 function sign(v) { return crypto.createHmac('sha256', SESSION_SECRET).update(v).digest('base64url'); }
 function makeSession() { const exp = String(Date.now() + SESSION_DAYS * 864e5); return exp + '.' + sign(exp); }

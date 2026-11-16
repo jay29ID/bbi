@@ -1,0 +1,181 @@
+[
+  {
+    "id": "crass-tshirt",
+    "name": "Crass T-Shirt",
+    "graphic": null,
+    "mockup": null,
+    "createdAt": 1763300000001,
+    "styles": [
+      {
+        "id": "crasstee",
+        "mockup": null,
+        "name": "T-shirt",
+        "price": 20,
+        "sizes": [
+          {
+            "size": "S",
+            "stock": 5
+          },
+          {
+            "size": "M",
+            "stock": 5
+          },
+          {
+            "size": "L",
+            "stock": 5
+          },
+          {
+            "size": "XL",
+            "stock": 5
+          },
+          {
+            "size": "2XL",
+            "stock": 5
+          },
+          {
+            "size": "3XL",
+            "stock": 5
+          },
+          {
+            "size": "4XL",
+            "stock": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "drinkin-skull",
+    "name": "Drinkin' Skull",
+    "graphic": null,
+    "mockup": null,
+    "createdAt": 1763300000002,
+    "styles": [
+      {
+        "id": "skulltee",
+        "mockup": null,
+        "name": "T-shirt",
+        "price": 20,
+        "sizes": [
+          {
+            "size": "S",
+            "stock": 5
+          },
+          {
+            "size": "M",
+            "stock": 5
+          },
+          {
+            "size": "L",
+            "stock": 5
+          },
+          {
+            "size": "XL",
+            "stock": 5
+          },
+          {
+            "size": "2XL",
+            "stock": 5
+          },
+          {
+            "size": "3XL",
+            "stock": 5
+          },
+          {
+            "size": "4XL",
+            "stock": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "hoodie",
+    "name": "BBI Hoodie",
+    "graphic": null,
+    "mockup": null,
+    "createdAt": 1763300000003,
+    "styles": [
+      {
+        "id": "hoodie01",
+        "mockup": null,
+        "name": "Hoodie",
+        "price": 40,
+        "sizes": [
+          {
+            "size": "S",
+            "stock": 5
+          },
+          {
+            "size": "M",
+            "stock": 5
+          },
+          {
+            "size": "L",
+            "stock": 5
+          },
+          {
+            "size": "XL",
+            "stock": 5
+          },
+          {
+            "size": "2XL",
+            "stock": 5
+          },
+          {
+            "price": 45,
+            "size": "3XL",
+            "stock": 5
+          },
+          {
+            "price": 45,
+            "size": "4XL",
+            "stock": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cd-bbi",
+    "name": "BBI CD",
+    "graphic": null,
+    "mockup": null,
+    "createdAt": 1763300000004,
+    "styles": [
+      {
+        "id": "cd000001",
+        "mockup": null,
+        "name": "CD",
+        "price": 10,
+        "sizes": [
+          {
+            "size": "One size",
+            "stock": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "calendar",
+    "name": "Calendar",
+    "graphic": null,
+    "mockup": null,
+    "createdAt": 1763300000005,
+    "styles": [
+      {
+        "id": "cal00001",
+        "mockup": null,
+        "name": "Calendar",
+        "price": 15,
+        "sizes": [
+          {
+            "size": "One size",
+            "stock": 5
+          }
+        ]
+      }
+    ]
+  }
+]
