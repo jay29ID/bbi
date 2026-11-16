@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BBI Merch Tracker</title>
+<meta name="theme-color" content="#18201B">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BBI Merch">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;800&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: one narrow column built for a phone at the merch table; sticky header, card grid of designs, full-screen editor sheet. */
+:root {
+  --bg: #EDF0EC;
+  --surface: #FFFFFF;
+  --surface-2: #F5F7F4;
+  --ink: #17201B;
+  --muted: #59655E;
+  --line: #D2D9D3;
+  --accent: #9A6812;        /* brass, like a tap handle */
+  --accent-ink: #FFFFFF;
+  --ok: #1F6B45;
+  --low: #B35C00;
+  --low-bg: #FCEBD6;
+  --out: #B3261E;
+  --out-bg: #FBE1DE;
+  --shadow: 0 1px 2px rgba(20,30,24,.06), 0 4px 14px rgba(20,30,24,.06);
+  --f-display: "Big Shoulders Stencil Display", "Impact", "Arial Narrow", sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1311; --surface: #18201B; --surface-2: #1E2722; --ink: #ECEFEA; --muted: #9AA69F; --line: #2C3731;
+    --accent: #E3B04B; --accent-ink: #1A1408; --ok: #5CC48E; --low: #F0A04B; --low-bg: #3A2A14; --out: #F2766D; --out-bg: #3D1C1A;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1311; --surface: #18201B; --surface-2: #1E2722; --ink: #ECEFEA; --muted: #9AA69F; --line: #2C3731;
+  --accent: #E3B04B; --accent-ink: #1A1408; --ok: #5CC48E; --low: #F0A04B; --low-bg: #3A2A14; --out: #F2766D; --out-bg: #3D1C1A;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px rgba(0,0,0,.25);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+img { max-width: 100%; }
+body { padding-top: env(safe-area-inset-top, 0px); }
+.login { max-width: 360px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
+.login h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 34px; text-transform: uppercase; }
+.login p { margin: 0; color: var(--muted); }
+.login .err { color: var(--out); min-height: 1.4em; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in { max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; flex-direction: column; line-height: 1; flex: none; }
+.brand b { font-family: var(--f-display); font-weight: 800; font-size: 28px; letter-spacing: .02em; text-transform: uppercase; }
+.brand span { font-family: var(--f-data); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+.spacer { flex: 1; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); font-weight: 600; white-space: nowrap; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--out); border-color: var(--out); background: transparent; }
+.btn.danger.armed { background: var(--out); color: var(--surface); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn svg { width: 18px; height: 18px; }
+
+main { max-width: 760px; margin: 0 auto; padding-block: 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.note { font-size: 14px; color: var(--muted); padding: 8px 12px; border: 1px dashed var(--line); border-radius: var(--r); margin-bottom: 12px; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 14px; font-family: var(--f-data); font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.summary b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 12px; }
+.card { text-align: left; padding: 0; border: 1px solid var(--line); background: var(--surface); border-radius: var(--r); overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.thumb { aspect-ratio: 1 / 1; max-width: 100%; width: 100%; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .ph { font-family: var(--f-display); font-size: 40px; color: var(--line); }
+.card-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.card-name { font-weight: 600; font-size: 16px; line-height: 1.2; overflow-wrap: anywhere; }
+.card-meta { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chip { font-family: var(--f-data); font-weight: 600; font-size: 13px; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip.ok { color: var(--ok); }
+.chip.low { background: var(--low-bg); color: var(--low); }
+.chip.out { background: var(--out-bg); color: var(--out); }
+
+.empty { text-align: center; padding: 48px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.empty h2 { font-family: var(--f-display); font-weight: 800; font-size: 34px; margin: 0; text-transform: uppercase; letter-spacing: .02em; }
+.empty p { margin: 0; color: var(--muted); max-width: 40ch; }
+
+.back { background: none; border: 0; padding: 8px 0; color: var(--muted); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
+.detail-head { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 18px; }
+@media (min-width: 620px) { .detail-head { grid-template-columns: 260px minmax(0, 1fr); align-items: start; } }
+.gallery .thumb { border-radius: var(--r); border: 1px solid var(--line); }
+.thumbs { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.thumbs button { width: 56px; height: 56px; padding: 0; border-radius: 8px; overflow: hidden; border: 2px solid transparent; background: var(--surface-2); }
+.thumbs button[aria-pressed="true"] { border-color: var(--accent); }
+.thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.d-title { font-family: var(--f-display); font-weight: 800; font-size: 38px; line-height: 1; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .01em; overflow-wrap: anywhere; text-wrap: balance; }
+.d-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.style { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 12px; overflow: hidden; }
+.style-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.style-head img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex: none; }
+.style-head h3 { margin: 0; font-size: 17px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.style-head .price { font-family: var(--f-data); font-weight: 600; color: var(--muted); font-size: 16px; }
+.style-head .tot { margin-left: auto; font-family: var(--f-data); font-weight: 600; font-size: 15px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.size-row { display: flex; align-items: center; gap: 10px; padding: 6px 12px; min-height: 56px; }
+.size-row + .size-row { border-top: 1px solid var(--line); }
+.sz { font-family: var(--f-data); font-weight: 700; font-size: 20px; width: 72px; flex: none; overflow-wrap: anywhere; line-height: 1.1; }
+.size-row .chip { margin-right: auto; }
+.size-row .grow { flex: 1; }
+.stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; flex: none; }
+.stepper button { width: 44px; height: 44px; border: 0; background: var(--surface-2); font-size: 22px; line-height: 1; }
+.stepper input { width: 56px; height: 44px; text-align: center; border: 0; background: var(--surface); font-family: var(--f-data); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+.style-empty { padding: 12px; color: var(--muted); font-size: 14px; }
+
+/* Editor sheet */
+.sheet { position: fixed; inset: 0; z-index: 20; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-top: env(safe-area-inset-top, 0px); }
+.sheet-in { max-width: 760px; margin: 0 auto; padding-block: 0 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sheet-head { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; align-items: center; gap: 12px; padding-block: 12px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.sheet-head h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 28px; text-transform: uppercase; letter-spacing: .02em; flex: 1; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; min-width: 0; }
+.field label, .lbl { font-family: var(--f-data); font-weight: 600; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.field input[type=text], .field input[type=number], .txt { height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-size: 17px; width: 100%; min-width: 0; }
+.uploads { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.drop { display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+.drop .thumb { border: 1px dashed var(--line); border-radius: var(--r); position: relative; }
+.drop .thumb .hint { padding: 8px; text-align: center; font-size: 14px; color: var(--muted); }
+.drop small { font-size: 13px; color: var(--muted); }
+.busy { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); font-weight: 600; font-size: 14px; }
+.sec-title { font-family: var(--f-display); font-weight: 800; font-size: 24px; text-transform: uppercase; letter-spacing: .02em; margin: 8px 0 4px; }
+.sec-help { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+.style-ed { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; margin-bottom: 12px; }
+.style-ed .row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+.style-ed .row .field { margin-bottom: 12px; }
+.style-ed-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mini-drop { width: 56px; height: 56px; flex: none; border-radius: 8px; border: 1px dashed var(--line); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; cursor: pointer; font-size: 11px; color: var(--muted); text-align: center; line-height: 1.1; position: relative; }
+.mini-drop img { width: 100%; height: 100%; object-fit: cover; }
+.style-ed-top .txt-wrap { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); }
+.size-toggles { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 12px; }
+.size-toggles button { min-width: 44px; height: 40px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); font-family: var(--f-data); font-weight: 600; font-size: 16px; }
+.size-toggles button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.qty-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.qty { display: flex; flex-direction: column; gap: 4px; }
+.qty label { font-family: var(--f-data); font-weight: 700; font-size: 15px; }
+.qty input.qp { height: 34px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.zp { font-family: var(--f-data); font-weight: 600; font-size: 15px; color: var(--muted); margin-left: -4px; }
+.qty input { height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); text-align: center; font-family: var(--f-data); font-weight: 700; font-size: 19px; width: 100%; min-width: 0; }
+.custom-size { display: flex; gap: 8px; }
+.custom-size .txt { height: 40px; font-size: 15px; }
+.custom-size .btn { min-height: 40px; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.sheet-foot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--surface); border-top: 1px solid var(--line);
+  padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sheet-foot-in { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; }
+.sheet-foot .err { color: var(--out); font-size: 14px; flex: 1; min-width: 0; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 40; background: var(--ink); color: var(--bg);
+  padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 15px; max-width: calc(100% - 32px); box-shadow: var(--shadow); }
+@media (prefers-reduced-motion: no-preference) { .card, .szbtn { transition: transform .12s ease; } .card:active, .szbtn:active { transform: scale(.97); } }
+
+/* Selling */
+body.has-tabs main { padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
+body.has-tabs .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+.status { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--f-data); font-weight: 600; font-size: 13px; letter-spacing: .03em; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.status.wait { background: var(--low-bg); color: var(--low); }
+.status.off { background: var(--out-bg); color: var(--out); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.tabbar-in { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; }
+.tab { background: none; border: 0; height: 58px; font-family: var(--f-display); font-weight: 800; font-size: 22px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-top: 3px solid transparent; }
+.tab[aria-current="page"] { color: var(--ink); border-top-color: var(--accent); }
+.cartbar { position: fixed; left: 0; right: 0; bottom: calc(61px + env(safe-area-inset-bottom, 0px)); z-index: 7;
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.cartbar-in { max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 12px; background: var(--ink); color: var(--bg); border-radius: 14px; padding: 8px 8px 8px 16px; box-shadow: var(--shadow); }
+.cartbar-in .sum { flex: 1; min-width: 0; font-weight: 600; }
+.cartbar-in .sum b { font-family: var(--f-data); font-size: 22px; font-variant-numeric: tabular-nums; margin-left: 6px; }
+.cartbar-in .btn { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.sell-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 24px; }
+.sell-card .card-body { gap: 2px; }
+.sell-card .price-line { font-family: var(--f-data); font-weight: 700; font-size: 18px; }
+.sell-card .thumb { aspect-ratio: 4 / 3; }
+.sell-style { margin-bottom: 18px; }
+.sell-style h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.sell-style h3 span { font-family: var(--f-data); color: var(--muted); font-weight: 600; }
+.szgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.szbtn { min-height: 76px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px; box-shadow: var(--shadow); }
+.szbtn b { font-family: var(--f-data); font-weight: 700; font-size: 26px; line-height: 1; }
+.szbtn small { font-family: var(--f-data); font-weight: 600; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.szbtn small.low { color: var(--low); }
+.szbtn .incart { font-family: var(--f-data); font-size: 13px; font-weight: 700; color: var(--accent); }
+.sell-card:disabled { opacity: .5; cursor: default; }
+.szbtn:disabled { box-shadow: none; opacity: .45; cursor: default; }
+.sell-hero { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+.sell-hero .thumb { width: 84px; flex: none; border-radius: var(--r); border: 1px solid var(--line); }
+.sell-hero h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 30px; line-height: 1; text-transform: uppercase; overflow-wrap: anywhere; min-width: 0; }
+.h-sec { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px; }
+.h-sec h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 24px; text-transform: uppercase; letter-spacing: .02em; }
+.h-sec span { font-family: var(--f-data); font-weight: 600; color: var(--muted); font-size: 16px; font-variant-numeric: tabular-nums; }
+.salelist { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.sale { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.sale + .sale { border-top: 1px solid var(--line); }
+.sale .when { font-family: var(--f-data); font-weight: 600; color: var(--muted); width: 64px; flex: none; font-variant-numeric: tabular-nums; }
+.sale .what { flex: 1; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
+.sale .what .chip { margin-left: 4px; }
+.sale .amt { font-family: var(--f-data); font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; text-align: right; }
+.sale .amt small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.sale .btn { min-height: 40px; padding: 0 12px; font-size: 14px; flex: none; }
+.sale .when { line-height: 1.2; }
+.cart-line { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+.cart-line + .cart-line { border-top: 1px solid var(--line); }
+.cart-line .what { flex: 1; min-width: 0; }
+.cart-line .what b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.cart-line .what span { font-size: 14px; color: var(--muted); }
+.cart-line .amt { font-family: var(--f-data); font-weight: 700; font-size: 18px; width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+.cart-total { display: flex; justify-content: space-between; align-items: baseline; margin: 16px 2px; font-family: var(--f-display); font-weight: 800; font-size: 30px; text-transform: uppercase; }
+.cart-total b { font-variant-numeric: tabular-nums; }
+.pay { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.pay .btn { min-height: 64px; border-radius: 14px; font-size: 20px; }
+.pay .btn.cash { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="brand"><b>BBI Merch</b><span>Stock tracker</span></div>
+  <div class="spacer"></div>
+  <span class="status" id="status" role="status" hidden></span>
+  <button class="btn primary" id="newBtn" type="button" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New design</button>
+</div></header>
+
+<main id="app"><div class="empty"><h2>Loading</h2><p>Getting your merch list.</p></div></main>
+<div class="cartbar" id="cartbar" hidden></div>
+<nav class="tabbar" id="tabbar" hidden><div class="tabbar-in">
+  <button class="tab" type="button" data-tab="sell">Sell</button>
+  <button class="tab" type="button" data-tab="stock">Stock</button>
+</div></nav>
+<div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const SIZES = ['XS','S','M','L','XL','2XL','3XL','4XL','5XL','One size'];
+const STYLE_PRESETS = [
+  { name: 'T-shirt', price: 25, sizes: ['S','M','L','XL','2XL'] },
+  { name: 'Hoodie', price: 50, sizes: ['S','M','L','XL','2XL'] },
+  { name: "Women's tee", price: 25, sizes: ['S','M','L','XL'] },
+  { name: 'Tank top', price: 25, sizes: ['S','M','L','XL'] },
+  { name: 'Hat', price: 25, sizes: ['One size'] },
+  { name: 'Other', price: 0, sizes: [] },
+];
+const LOW = 3;
+
+let signedIn = null, canWrite = true;
+const assets = true;
+const LS_D = 'bbi.data.v1', LS_AUTH = 'bbi.signedin';
+const dirty = new Map();
+let designs = [], loaded = false, staleNote = '';
+const pending = new Map();      // designId -> styles awaiting save
+const saveTimers = new Map();
+const writeQ = new Map();
+let view = { name: location.hash === '#stock' ? 'list' : 'sell' };
+let form = null;
+let renderDeferred = false;
+
+/* Selling state. Sales and stock changes wait in a local queue until they reach the store, so the table keeps working with no signal. */
+const LS_Q = 'bbi.queue.v1', LS_CART = 'bbi.cart.v1';
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let queue = ls.get(LS_Q, []);   // [{kind:'sale'|'void', sale, saleDone, stockDone}]
+let cart = ls.get(LS_CART, []); // [{designId, styleId, size, qty}]
+let sales = [], syncing = false, syncProblem = '';
+let voidArmed = null;
+const saveQ = () => ls.set(LS_Q, queue);
+const saveCart = () => ls.set(LS_CART, cart);
+const withTimeout = (p, ms = 12000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
+const keyOf = (s, z) => s + '\u0000' + z;
+function queuedDelta(designId) {
+  const m = new Map();
+  for (const op of queue) {
+    if (op.stockDone) continue;
+    const sign = op.kind === 'sale' ? 1 : -1;
+    for (const it of op.sale.items) if (it.designId === designId) { const k = keyOf(it.styleId, it.size); m.set(k, (m.get(k) || 0) + sign * it.qty); }
+  }
+  return m;
+}
+function displayStyles(d) {
+  const delta = queuedDelta(d.id), base = stylesOf(d);
+  if (!delta.size) return base;
+  return base.map(st => ({ ...st, sizes: (st.sizes || []).map(z => { const q = delta.get(keyOf(st.id, z.size)); return q ? { ...z, stock: Math.max(0, (Number(z.stock) || 0) - q) } : z; }) }));
+}
+const cartQty = (designId, styleId, size) => cart.filter(c => c.designId === designId && c.styleId === styleId && c.size === size).reduce((n, c) => n + c.qty, 0);
+function cartLines() {
+  const out = [];
+  for (const c of cart) {
+    const d = designs.find(x => x.id === c.designId); if (!d) continue;
+    const st = stylesOf(d).find(s => s.id === c.styleId); if (!st) continue;
+    const z = (st.sizes || []).find(x => x.size === c.size); if (!z) continue;
+    out.push({ ...c, d, st, z, price: sizePrice(st, z) });
+  }
+  return out;
+}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const blob = id => id ? '/img/' + id : '';
+const money = n => { n = Number(n) || 0; return '$' + (n % 1 ? n.toFixed(2) : n); };
+const slug = s => String(s).replace(/[^a-z0-9]/gi, '_');
+const sizeRank = s => { const i = SIZES.indexOf(s); return i < 0 ? 99 : i; };
+const sortSizes = arr => arr.slice().sort((a, b) => sizeRank(a.size) - sizeRank(b.size));
+const stylesOf = d => pending.get(d.id) || d.styles || [];
+const sizePrice = (st, z) => (z.price != null && z.price !== '') ? Number(z.price) : Number(st.price) || 0;
+function priceRange(st) {
+  const ps = (st.sizes || []).map(z => sizePrice(st, z));
+  if (!ps.length) return money(st.price);
+  const lo = Math.min(...ps), hi = Math.max(...ps);
+  return lo === hi ? money(lo) : money(lo) + '–' + String(money(hi)).slice(1);
+}
+const styleTotal = st => (st.sizes || []).reduce((n, z) => n + (Number(z.stock) || 0), 0);
+const designTotal = d => displayStyles(d).reduce((n, st) => n + styleTotal(st), 0);
+function counts(d) {
+  let low = 0, out = 0;
+  for (const st of displayStyles(d)) for (const z of st.sizes || []) { const q = Number(z.stock) || 0; if (q === 0) out++; else if (q <= LOW) low++; }
+  return { low, out };
+}
+function stockChip(q) {
+  q = Number(q) || 0;
+  if (q === 0) return '<span class="chip out">Sold out</span>';
+  if (q <= LOW) return '<span class="chip low">Low</span>';
+  return '<span class="grow"></span>';
+}
+function heroImg(d) {
+  if (d.mockup) return d.mockup;
+  const st = (d.styles || []).find(s => s.mockup);
+  return st ? st.mockup : d.graphic;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600);
+}
+function errText(e, what) {
+  if (e && e.code === 'http' && e.message) return e.message;
+  if (e && e.code === 'auth') return 'Sign in again to keep going.';
+  return `Couldn't ${what}. Check your signal and try again.`;
+}
+async function api(method, path, body, raw) {
+  const opt = { method, headers: {}, credentials: 'same-origin' };
+  if (raw) { opt.body = raw.body; opt.headers['Content-Type'] = raw.type; }
+  else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
+  let r;
+  try { r = await withTimeout(fetch(path, opt), 15000); } catch { throw { code: 'network' }; }
+  if (r.status === 401) { setSignedIn(false); throw { code: 'auth', status: 401 }; }
+  let data = null; try { data = await r.json(); } catch {}
+  if (!r.ok) throw { code: 'http', status: r.status, message: data && data.error };
+  return data;
+}
+function setSignedIn(v) { const was = signedIn; signedIn = v; ls.set(LS_AUTH, !!v); if (was !== v) render(); }
+function queueWrite(id, fn, what) {
+  const p = (writeQ.get(id) || Promise.resolve()).then(fn).catch(e => { if (what) toast(errText(e, what)); throw e; });
+  writeQ.set(id, p.catch(() => {}));
+  return p;
+}
+
+/* ---------- Rendering ---------- */
+function render() {
+  if (document.activeElement && document.activeElement.matches('#app input')) { renderDeferred = true; return; }
+  renderDeferred = false;
+  if (signedIn === false) { renderChrome(false); return renderLogin(); }
+  const selling = ['sell', 'sell-design', 'cart'].includes(view.name);
+  $('#newBtn').hidden = !(signedIn && canWrite) || selling;
+  renderChrome(selling);
+  if (view.name === 'design' || view.name === 'sell-design') {
+    const d = designs.find(x => x.id === view.id);
+    if (d) return view.name === 'design' ? renderDesign(d) : renderSellDesign(d);
+    view = { name: selling ? 'sell' : 'list' };
+  }
+  if (view.name === 'cart') return renderCart();
+  if (view.name === 'sell') return renderSell();
+  renderList();
+}
+
+function renderChrome(selling) {
+  const on = !!signedIn;
+  document.body.classList.toggle('has-tabs', on);
+  $('#tabbar').hidden = !on;
+  for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-current', (t.dataset.tab === 'sell') === selling ? 'page' : 'false');
+  const st = $('#status'), waiting = queue.filter(op => op.kind === 'sale' && !(op.saleDone && op.stockDone)).length;
+  const offline = navigator.onLine === false;
+  if (waiting) { st.hidden = false; st.className = 'status wait'; st.textContent = `${waiting} waiting for signal`; }
+  else if (offline) { st.hidden = false; st.className = 'status off'; st.textContent = 'No signal'; }
+  else st.hidden = true;
+  const cb = $('#cartbar'), lines = cartLines();
+  if (on && lines.length && view.name !== 'cart' && selling) {
+    const n = lines.reduce((a, l) => a + l.qty, 0), tot = lines.reduce((a, l) => a + l.qty * l.price, 0);
+    cb.innerHTML = `<div class="cartbar-in"><span class="sum">${n} item${n > 1 ? 's' : ''}<b>${money(tot)}</b></span><button class="btn ghost" type="button" data-act="clearcart" style="background:transparent;border-color:transparent;color:inherit">Cancel</button><button class="btn" type="button" data-act="checkout">Take payment</button></div>`;
+    cb.hidden = false;
+  } else { cb.hidden = true; cb.innerHTML = ''; }
+}
+
+/* ---------- Sell screens ---------- */
+function timeOf(ts) { try { return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch { return ''; } }
+function itemsText(items) { return items.map(it => `${it.qty > 1 ? it.qty + '× ' : ''}${it.designName}${it.styleName && !it.designName.toLowerCase().includes(it.styleName.toLowerCase()) ? ' ' + it.styleName : ''}${it.size !== 'One size' ? ' ' + it.size : ''}`).join(', '); }
+function allSales() {
+  const voided = new Set(queue.filter(op => op.kind === 'void').map(op => op.sale.id));
+  const queued = queue.filter(op => op.kind === 'sale' && !op.saleDone).map(op => ({ ...op.sale, waiting: true }));
+  const queuedIds = new Set(queued.map(s => s.id));
+  const waitingStock = new Set(queue.filter(op => op.kind === 'sale' && !op.stockDone).map(op => op.sale.id));
+  const synced = sales.filter(s => !queuedIds.has(s.id) && !voided.has(s.id)).map(s => waitingStock.has(s.id) ? { ...s, waiting: true } : s);
+  return [...queued, ...synced].sort((a, b) => b.at - a.at);
+}
+function renderSell() {
+  const app = $('#app');
+  const note = staleNote ? `<div class="note">${esc(staleNote)}</div>` : '';
+  if (!loaded) { app.innerHTML = note + `<div class="empty"><h2>Loading</h2><p>Getting your merch list.</p></div>`; return; }
+  const items = designs.filter(d => stylesOf(d).some(st => (st.sizes || []).length));
+  const cards = items.map(d => {
+    const img = heroImg(d), tot = designTotal(d);
+    const ps = stylesOf(d).flatMap(st => (st.sizes || []).map(z => sizePrice(st, z)));
+    const lo = Math.min(...ps), hi = Math.max(...ps);
+    return `<button class="card sell-card" type="button" data-sell="${esc(d.id)}" ${tot ? '' : 'disabled'}>
+      <div class="thumb">${img ? `<img src="${blob(img)}" alt="" loading="lazy">` : '<span class="ph">BBI</span>'}</div>
+      <div class="card-body"><div class="card-name">${esc(d.name)}</div>
+        <div class="price-line">${lo === hi ? money(lo) : money(lo) + '–' + String(money(hi)).slice(1)}</div>
+        <div class="card-meta">${tot ? tot + ' left' : 'Sold out'}</div></div></button>`;
+  }).join('');
+  const today = new Date().toDateString();
+  const everything = allSales();
+  const list = everything.filter(s => new Date(s.at).toDateString() === today);
+  const earlier = everything.filter(s => new Date(s.at).toDateString() !== today).slice(0, 40);
+  const total = list.reduce((a, s) => a + (Number(s.total) || 0), 0);
+  const cash = list.filter(s => s.payment === 'cash').reduce((a, s) => a + (Number(s.total) || 0), 0);
+  const row = (s, showDay) => `<div class="sale">
+      <span class="when">${showDay ? esc(dayOf(s.at)) + '<br>' : ''}${esc(timeOf(s.at))}</span>
+      <span class="what">${esc(itemsText(s.items || []))}${s.waiting ? '<span class="chip low">Waiting for signal</span>' : ''}</span>
+      <span class="amt">${money(s.total)}<small>${esc(s.payment)}</small></span>
+      ${canWrite ? `<button class="btn ${voidArmed === s.id ? 'danger armed' : 'danger'}" type="button" data-void="${esc(s.id)}" aria-label="Cancel this sale">${voidArmed === s.id ? 'Tap to confirm' : 'Cancel'}</button>` : ''}
+    </div>`;
+  const rows = list.slice(0, 60).map(s => row(s, false)).join('');
+  app.innerHTML = note + (items.length ? `<div class="sell-grid">${cards}</div>` :
+      `<div class="empty"><h2>Nothing to sell yet</h2><p>Add designs with sizes on the Stock tab first.</p></div>`) +
+    `<div class="h-sec"><h2>Today's sales</h2><span>${list.length} sale${list.length === 1 ? '' : 's'} · ${money(total)}${list.length ? ` · cash ${money(cash)} · card ${money(total - cash)}` : ''}</span></div>
+     ${rows ? `<p class="sec-help">Tap Cancel on a sale to remove it and put its items back in stock.</p><div class="salelist">${rows}</div>` : '<p class="sec-help">Sales you record show up here. Tap an item above to start.</p>'}
+     ${earlier.length ? `<div class="h-sec" style="margin-top:22px"><h2>Earlier this week</h2></div><div class="salelist">${earlier.map(s => row(s, true)).join('')}</div>` : ''}
+     ${syncProblem ? `<p class="sec-help">${esc(syncProblem)}</p>` : ''}`;
+}
+function dayOf(ts) { try { return new Date(ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return ''; } }
+function renderSellDesign(d) {
+  const app = $('#app'), img = heroImg(d);
+  const styles = displayStyles(d).filter(st => (st.sizes || []).length);
+  app.innerHTML = `<button class="back" type="button" data-act="sellhome">‹ All items</button>
+    <div class="sell-hero"><div class="thumb">${img ? `<img src="${blob(img)}" alt="">` : '<span class="ph" style="font-size:22px">BBI</span>'}</div><h2>${esc(d.name)}</h2></div>
+    ${styles.map(st => `<section class="sell-style"><h3>${esc(st.name)} <span>${priceRange(st)}</span></h3><div class="szgrid">
+      ${sortSizes(st.sizes).map(z => {
+        const inCart = cartQty(d.id, st.id, z.size), left = Math.max(0, (Number(z.stock) || 0) - inCart);
+        const zp = sizePrice(st, z) !== Number(st.price) ? ' · ' + money(sizePrice(st, z)) : '';
+        return `<button class="szbtn" type="button" data-add="${esc(z.size)}" data-style="${esc(st.id)}" ${left ? '' : 'disabled'} aria-label="Add ${esc(st.name)} ${esc(z.size)}">
+          <b>${esc(z.size === 'One size' ? 'Add' : z.size)}</b><small class="${left && left <= LOW ? 'low' : ''}">${left ? left + ' left' : 'Sold out'}${zp}</small>
+          ${inCart ? `<span class="incart">${inCart} in sale</span>` : ''}</button>`;
+      }).join('')}</div></section>`).join('')}`;
+}
+function renderCart() {
+  const app = $('#app'), lines = cartLines();
+  if (!lines.length) { view = { name: 'sell' }; return render(); }
+  const tot = lines.reduce((a, l) => a + l.qty * l.price, 0);
+  app.innerHTML = `<button class="back" type="button" data-act="sellhome">‹ Add more items</button>
+    <div class="h-sec"><h2>This sale</h2></div>
+    <div class="salelist">${lines.map((l, i) => {
+      const left = Math.max(0, (Number(displayStyles(l.d).find(s => s.id === l.st.id)?.sizes.find(z => z.size === l.size)?.stock) || 0) - cartQty(l.designId, l.styleId, l.size));
+      return `<div class="cart-line"><div class="what"><b>${esc(l.d.name)}</b><span>${esc(l.st.name)}${l.size !== 'One size' ? ' · ' + esc(l.size) : ''} · ${money(l.price)}</span></div>
+        <div class="stepper"><button type="button" data-cq="-1" data-i="${i}" aria-label="One less">−</button><input type="number" readonly value="${l.qty}" aria-label="Quantity" id="cq-${i}"><button type="button" data-cq="1" data-i="${i}" aria-label="One more" ${left ? '' : 'disabled'}>+</button></div>
+        <span class="amt">${money(l.qty * l.price)}</span></div>`;
+    }).join('')}</div>
+    <div class="cart-total"><span>Total</span><b>${money(tot)}</b></div>
+    <div class="pay"><button class="btn cash" type="button" data-pay="cash">Cash</button><button class="btn primary" type="button" data-pay="card">Card</button></div>
+    <p class="sec-help">Tap how they paid to record the sale. Take card payments on your card reader as usual.</p>
+    <button class="btn danger" type="button" data-act="clearcart">Cancel this sale</button>`;
+}
+
+function addToCart(designId, styleId, size) {
+  const c = cart.find(x => x.designId === designId && x.styleId === styleId && x.size === size);
+  if (c) c.qty++; else cart.push({ designId, styleId, size, qty: 1 });
+  saveCart(); render();
+}
+function recordSale(payment) {
+  const lines = cartLines(); if (!lines.length) return;
+  const items = lines.map(l => ({ designId: l.designId, designName: l.d.name, styleId: l.styleId, styleName: l.st.name, size: l.size, qty: l.qty, price: l.price }));
+  const total = items.reduce((a, it) => a + it.qty * it.price, 0);
+  const sale = { id: 's' + Date.now().toString(36) + uid(), at: Date.now(), items, total, payment };
+  queue.push({ kind: 'sale', sale, saleDone: false, stockDone: false }); saveQ();
+  cart = []; saveCart();
+  view = { name: 'sell' }; render(); window.scrollTo(0, 0);
+  toast(`Sale recorded · ${money(total)} ${payment}`);
+  sync();
+}
+function voidSale(id) {
+  if (voidArmed !== id) { voidArmed = id; render(); setTimeout(() => { if (voidArmed === id) { voidArmed = null; render(); } }, 5000); return; }
+  voidArmed = null;
+  const qi = queue.findIndex(op => op.kind === 'sale' && op.sale.id === id);
+  if (qi >= 0 && !queue[qi].saleDone && !queue[qi].stockDone) queue.splice(qi, 1);
+  else {
+    const s = qi >= 0 ? queue[qi].sale : sales.find(x => x.id === id);
+    if (!s) return;
+    queue.push({ kind: 'void', sale: { id: s.id, items: s.items }, saleDone: false, stockDone: false });
+  }
+  saveQ(); render(); toast('Sale cancelled, items back in stock'); sync();
+}
+
+/* ---------- Sync ---------- */
+// The server records each sale once by its id, so resending after a dropped connection is safe.
+async function sync() {
+  if (syncing || !signedIn || !queue.length) return;
+  syncing = true; let did = false;
+  try {
+    while (queue.length) {
+      const op = queue[0];
+      if (op.kind === 'sale') await api('POST', '/api/sales', op.sale);
+      else await api('POST', `/api/sales/${encodeURIComponent(op.sale.id)}/void`);
+      queue.shift(); saveQ(); did = true;
+    }
+    syncProblem = '';
+  } catch (e) {
+    if (e.code === 'http' && e.status === 400) { queue.shift(); saveQ(); syncProblem = e.message || 'One sale could not be saved and was skipped.'; }
+    else syncProblem = '';
+  } finally { syncing = false; if (did) refresh(); else render(); }
+}
+function saveCache() { ls.set(LS_D, { designs, sales, at: Date.now() }); }
+let refreshing = false;
+async function refresh() {
+  if (refreshing || !signedIn) return;
+  refreshing = true;
+  try {
+    const [ds, ss] = await Promise.all([api('GET', '/api/designs'), api('GET', '/api/sales?since=' + (Date.now() - 7 * 864e5))]);
+    designs = ds; sales = ss; loaded = true; staleNote = '';
+    saveCache();
+  } catch (e) {
+    if (e.code !== 'auth') staleNote = loaded ? 'No signal right now. Showing the last counts this phone saw. Sales still get saved.' : "Can't reach the server yet. Check your signal.";
+  } finally { refreshing = false; render(); }
+}
+window.addEventListener('online', () => refresh());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); sync(); } });
+setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 20000);
+window.addEventListener('online', () => { render(); sync(); });
+window.addEventListener('offline', () => render());
+setInterval(() => { if (queue.length) sync(); }, 15000);
+
+function renderList() {
+  const app = $('#app');
+  const note = staleNote ? `<div class="note">${esc(staleNote)}</div>` : '';
+  if (!loaded) { app.innerHTML = note + `<div class="empty"><h2>Loading</h2><p>Getting your merch list.</p></div>`; return; }
+  if (!designs.length) {
+    app.innerHTML = note + `<div class="empty"><h2>No designs yet</h2>
+      <p>Add your first design: upload the artwork and a mock-up, then pick the styles and sizes you have and how many of each.</p>
+      ${canWrite ? '<button class="btn primary" type="button" data-act="new">Add a design</button>' : ''}</div>`;
+    return;
+  }
+  let units = 0, low = 0, out = 0;
+  for (const d of designs) { units += designTotal(d); const c = counts(d); low += c.low; out += c.out; }
+  const cards = designs.map(d => {
+    const st = stylesOf(d), c = counts(d), img = heroImg(d), tot = designTotal(d);
+    return `<button class="card" type="button" data-open="${esc(d.id)}">
+      <div class="thumb">${img ? `<img src="${blob(img)}" alt="" loading="lazy">` : '<span class="ph">BBI</span>'}</div>
+      <div class="card-body">
+        <div class="card-name">${esc(d.name || 'Untitled design')}</div>
+        <div class="card-meta">${st.length ? esc(st.map(s => s.name).join(' · ')) : 'No styles yet'}</div>
+        <div class="chips"><span class="chip ${tot ? 'ok' : 'out'}">${tot} in stock</span>
+          ${c.out ? `<span class="chip out">${c.out} sold out</span>` : ''}${c.low ? `<span class="chip low">${c.low} low</span>` : ''}</div>
+      </div></button>`;
+  }).join('');
+  app.innerHTML = note + `<div class="summary"><span><b>${designs.length}</b> designs</span><span><b>${units}</b> items in stock</span>
+    <span><b>${low}</b> sizes low</span><span><b>${out}</b> sold out</span></div><div class="grid">${cards}</div>
+    <p style="margin-top:28px"><button class="btn ghost" type="button" data-act="logout">Sign out</button></p>`;
+}
+
+function renderDesign(d) {
+  const app = $('#app');
+  const imgs = [];
+  if (d.mockup) imgs.push({ id: d.mockup, label: 'Mock-up' });
+  if (d.graphic) imgs.push({ id: d.graphic, label: 'Graphic' });
+  for (const st of d.styles || []) if (st.mockup) imgs.push({ id: st.mockup, label: st.name + ' mock-up' });
+  const cur = imgs.find(i => i.id === view.img) || imgs[0];
+  const styles = displayStyles(d);
+  const c = counts(d);
+  const styleHtml = styles.map(st => {
+    const rows = sortSizes(st.sizes || []).map(z => {
+      const q = Number(z.stock) || 0, k = `q-${slug(st.id)}-${slug(z.size)}`;
+      const zp = sizePrice(st, z) !== Number(st.price) ? `<span class="zp">${money(sizePrice(st, z))}</span>` : '';
+      return `<div class="size-row"><span class="sz">${esc(z.size)}</span>${zp}${stockChip(q)}
+        ${canWrite ? `<div class="stepper">
+          <button type="button" aria-label="One less ${esc(z.size)}" data-step="-1" data-style="${esc(st.id)}" data-size="${esc(z.size)}">−</button>
+          <label class="vh" for="${k}">${esc(st.name)} ${esc(z.size)} count</label>
+          <input id="${k}" type="number" inputmode="numeric" min="0" value="${q}" data-style="${esc(st.id)}" data-size="${esc(z.size)}">
+          <button type="button" aria-label="One more ${esc(z.size)}" data-step="1" data-style="${esc(st.id)}" data-size="${esc(z.size)}">+</button>
+        </div>` : `<span class="sz" style="text-align:right">${q}</span>`}</div>`;
+    }).join('');
+    return `<section class="style"><div class="style-head">
+        ${st.mockup ? `<img src="${blob(st.mockup)}" alt="">` : ''}
+        <h3>${esc(st.name)}</h3><span class="price">${priceRange(st)}</span><span class="tot">${styleTotal(st)} in stock</span></div>
+        ${rows || '<div class="style-empty">No sizes added yet. Tap Edit design to add some.</div>'}</section>`;
+  }).join('');
+  app.innerHTML = (staleNote ? `<div class="note">${esc(staleNote)}</div>` : '') + `
+    <button class="back" type="button" data-act="home">‹ All designs</button>
+    <div class="detail-head">
+      <div class="gallery"><div class="thumb">${cur ? `<img src="${blob(cur.id)}" alt="${esc(cur.label)}">` : '<span class="ph">BBI</span>'}</div>
+        ${imgs.length > 1 ? `<div class="thumbs">${imgs.map(i => `<button type="button" data-img="${esc(i.id)}" aria-label="Show ${esc(i.label)}" aria-pressed="${cur && i.id === cur.id}"><img src="${blob(i.id)}" alt=""></button>`).join('')}</div>` : ''}
+      </div>
+      <div>
+        <h2 class="d-title">${esc(d.name || 'Untitled design')}</h2>
+        <div class="chips"><span class="chip ${designTotal(d) ? 'ok' : 'out'}">${designTotal(d)} in stock</span>
+          ${c.out ? `<span class="chip out">${c.out} sold out</span>` : ''}${c.low ? `<span class="chip low">${c.low} low</span>` : ''}</div>
+        ${canWrite ? `<div class="d-actions"><button class="btn" type="button" data-act="edit">Edit design</button></div>` : ''}
+      </div>
+    </div>
+    ${styleHtml || `<div class="empty"><p>This design has no styles yet.</p></div>`}`;
+}
+
+/* ---------- Stock changes ---------- */
+function setStock(designId, styleId, size, val) {
+  const d = designs.find(x => x.id === designId); if (!d) return;
+  const styles = structuredClone(stylesOf(d));
+  const st = styles.find(s => s.id === styleId); if (!st) return;
+  const z = (st.sizes || []).find(x => x.size === size); if (!z) return;
+  z.stock = Math.max(0, Math.round(Number(val)) || 0);
+  pending.set(designId, styles);
+  if (!dirty.has(designId)) dirty.set(designId, new Set());
+  dirty.get(designId).add(keyOf(styleId, size));
+  render();
+  clearTimeout(saveTimers.get(designId));
+  saveTimers.set(designId, setTimeout(() => flush(designId), 700));
+}
+function flush(id) {
+  const styles = pending.get(id), keys = dirty.get(id); if (!styles || !keys) return;
+  dirty.delete(id);
+  queueWrite(id, async () => {
+    let doc = null;
+    for (const k of keys) {
+      const i = k.indexOf('\u0000'), styleId = k.slice(0, i), size = k.slice(i + 1);
+      const z = styles.find(s => s.id === styleId)?.sizes.find(x => x.size === size);
+      if (z) doc = await api('POST', `/api/designs/${encodeURIComponent(id)}/stock`, { styleId, size, stock: z.stock });
+    }
+    if (doc) designs = designs.map(d => d.id === id ? doc : d);
+    if (pending.get(id) === styles) pending.delete(id);
+    saveCache(); render();
+  }, 'save the stock count').catch(() => { if (pending.get(id) === styles) { pending.delete(id); render(); } });
+}
+
+/* ---------- Editor ---------- */
+function openEditor(d) {
+  const styles = d ? structuredClone(stylesOf(d)) : [];
+  form = {
+    id: d ? d.id : null, name: d ? d.name || '' : '', graphic: d ? d.graphic || null : null, mockup: d ? d.mockup || null : null,
+    styles, createdAt: d ? d.createdAt || Date.now() : Date.now(),
+    orig: d ? assetIds({ graphic: d.graphic, mockup: d.mockup, styles: d.styles || [] }) : [],
+    uploaded: [], busy: {}, err: '', armed: false, saving: false, customSize: {},
+  };
+  if (!d) addStyle(STYLE_PRESETS[0], false);
+  renderSheet(true);
+}
+function assetIds(f) { return [f.graphic, f.mockup, ...(f.styles || []).map(s => s.mockup)].filter(Boolean); }
+function addStyle(p, rerender = true) {
+  form.styles.push({ id: uid(), name: p.name === 'Other' ? '' : p.name, price: p.price, mockup: null, sizes: p.sizes.map(s => ({ size: s, stock: 0 })) });
+  if (rerender) renderSheet();
+}
+function closeEditor() {
+  if (!form) return;
+  const leftovers = form.uploaded.filter(id => !form.orig.includes(id));
+  cleanupAssets(leftovers);
+  form = null; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = '';
+  render();
+}
+function cleanupAssets(ids) { for (const id of ids) api('DELETE', '/api/images/' + encodeURIComponent(id)).catch(() => {}); }
+
+function upTile(key, id, title, sub) {
+  const busy = form.busy[key];
+  return `<label class="drop" for="up-${key}"><span class="lbl">${title}</span>
+    <div class="thumb">${id ? `<img src="${blob(id)}" alt="">` : `<span class="hint">Tap to add ${title.toLowerCase()}</span>`}${busy ? '<span class="busy">Uploading…</span>' : ''}</div>
+    <small>${sub}</small>
+    <input class="vh" type="file" accept="image/*" id="up-${key}" data-up="${key}" ${assets ? '' : 'disabled'}></label>`;
+}
+function renderSheet(first) {
+  const sh = $('#sheet');
+  const styles = form.styles.map(st => {
+    const chosen = new Set((st.sizes || []).map(z => z.size));
+    const allSizes = [...SIZES, ...[...chosen].filter(s => !SIZES.includes(s))];
+    const busy = form.busy['s:' + st.id];
+    return `<div class="style-ed">
+      <div class="style-ed-top">
+        <label class="mini-drop" for="up-s-${st.id}" title="Add a mock-up for this style">${st.mockup ? `<img src="${blob(st.mockup)}" alt="">` : 'Style<br>mock-up'}${busy ? '<span class="busy">…</span>' : ''}
+          <input class="vh" type="file" accept="image/*" id="up-s-${st.id}" data-up="s:${st.id}" ${assets ? '' : 'disabled'}></label>
+        <div class="txt-wrap">Optional photo of this style, like the hoodie version.</div>
+        <button class="btn ghost" type="button" data-rm-style="${st.id}">Remove</button>
+      </div>
+      <div class="row">
+        <div class="field"><label for="sn-${st.id}">Style</label><input class="txt" type="text" id="sn-${st.id}" data-sf="name" data-style="${st.id}" value="${esc(st.name)}" placeholder="e.g. Hoodie"></div>
+        <div class="field"><label for="sp-${st.id}">Price $</label><input class="txt" type="number" inputmode="decimal" min="0" step="0.5" id="sp-${st.id}" data-sf="price" data-style="${st.id}" value="${esc(st.price)}"></div>
+      </div>
+      <span class="lbl">Sizes</span>
+      <div class="size-toggles">${allSizes.map(s => `<button type="button" data-tsize="${esc(s)}" data-style="${st.id}" aria-pressed="${chosen.has(s)}">${esc(s)}</button>`).join('')}</div>
+      ${st.sizes.length ? `<span class="lbl">How many in stock</span><div class="qty-grid">${sortSizes(st.sizes).map(z => {
+        const k = `sq-${st.id}-${slug(z.size)}`;
+        return `<div class="qty"><label for="${k}">${esc(z.size)}</label><input type="number" inputmode="numeric" min="0" id="${k}" data-sq="${esc(z.size)}" data-style="${st.id}" value="${Number(z.stock) || 0}">
+          <label class="vh" for="${k}-p">${esc(z.size)} price if different</label><input class="qp" type="number" inputmode="decimal" min="0" step="0.5" id="${k}-p" data-szp="${esc(z.size)}" data-style="${st.id}" placeholder="$ same" value="${z.price != null && z.price !== '' ? esc(z.price) : ''}"></div>`;
+      }).join('')}</div>` : ''}
+      <div class="custom-size"><label class="vh" for="cs-${st.id}">Custom size</label>
+        <input class="txt" type="text" id="cs-${st.id}" data-cs="${st.id}" placeholder="Other size, e.g. Youth M" value="${esc(form.customSize[st.id] || '')}">
+        <button class="btn" type="button" data-addsize="${st.id}">Add size</button></div>
+    </div>`;
+  }).join('');
+  sh.innerHTML = `<div class="sheet-in">
+    <div class="sheet-head"><h2>${form.id ? 'Edit design' : 'New design'}</h2><button class="btn ghost" type="button" data-act="cancel">Cancel</button></div>
+    <div class="field"><label for="f-name">Design name</label><input type="text" id="f-name" data-f="name" value="${esc(form.name)}" placeholder="e.g. Bearded Skull 2026 tour"></div>
+    ${assets ? '' : '<div class="note">Image uploads need edit access to this page. You can still set up styles and sizes.</div>'}
+    <div class="uploads">
+      ${upTile('graphic', form.graphic, 'Graphic', 'The artwork file')}
+      ${upTile('mockup', form.mockup, 'Mock-up', 'How it looks on the shirt')}
+    </div>
+    <div class="sec-title">Styles and sizes</div>
+    <p class="sec-help">Add each garment this design is printed on, then tap the sizes you carry and enter how many you have.</p>
+    ${styles}
+    <span class="lbl">Add a style</span>
+    <div class="presets">${STYLE_PRESETS.map((p, i) => `<button class="btn" type="button" data-preset="${i}">+ ${esc(p.name)}</button>`).join('')}</div>
+  </div>
+  <div class="sheet-foot"><div class="sheet-foot-in">
+    ${form.id ? `<button class="btn danger ${form.armed ? 'armed' : ''}" type="button" data-act="delete">${form.armed ? 'Tap again to delete' : 'Delete'}</button>` : ''}
+    <span class="err" role="alert">${esc(form.err)}</span>
+    <button class="btn primary" type="button" data-act="save" ${form.saving || Object.values(form.busy).some(Boolean) ? 'disabled' : ''}>${form.saving ? 'Saving…' : 'Save design'}</button>
+  </div></div>`;
+  if (first) { sh.hidden = false; sh.scrollTop = 0; document.body.style.overflow = 'hidden'; }
+}
+
+async function prepImage(file) {
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
+  const keepAlpha = /png|webp/.test(file.type);
+  const url = URL.createObjectURL(file);
+  try {
+    const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, 1600 / Math.max(w, h));
+    if (s === 1 && file.size < 2.5e6 && /png|jpeg|webp/.test(file.type)) return file;
+    const c = document.createElement('canvas'); c.width = Math.round(w * s); c.height = Math.round(h * s);
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    const out = await new Promise(r => c.toBlob(r, keepAlpha ? 'image/png' : 'image/jpeg', 0.85));
+    return out || file;
+  } catch { return file; } finally { URL.revokeObjectURL(url); }
+}
+async function handleUpload(key, file) {
+  if (!file || !assets || !form) return;
+  const f = form;
+  f.busy[key] = true; f.err = ''; renderSheet();
+  try {
+    const b = await prepImage(file);
+    const type = b.type || file.type || 'image/jpeg';
+    const r = await api('POST', '/api/images', undefined, { body: b, type });
+    if (form !== f) { cleanupAssets([r.id]); return; }
+    f.uploaded.push(r.id);
+    if (key === 'graphic' || key === 'mockup') f[key] = r.id;
+    else { const st = f.styles.find(s => 's:' + s.id === key); if (st) st.mockup = r.id; }
+  } catch (e) {
+    if (form === f) f.err = errText(e, 'upload that image');
+  } finally {
+    if (form === f) { f.busy[key] = false; renderSheet(); }
+  }
+}
+
+async function saveForm() {
+  const f = form;
+  f.name = f.name.trim();
+  if (!f.name) { f.err = 'Give the design a name first.'; renderSheet(); $('#f-name').focus(); return; }
+  for (const st of f.styles) st.name = (st.name || '').trim();
+  const unnamed = f.styles.find(st => !st.name);
+  if (unnamed) { f.err = 'Every style needs a name, like "Hoodie".'; renderSheet(); $('#sn-' + unnamed.id)?.focus(); return; }
+  const doc = {
+    name: f.name, graphic: f.graphic, mockup: f.mockup, createdAt: f.createdAt, updatedAt: Date.now(),
+    styles: f.styles.map(st => ({ id: st.id, name: st.name, price: Math.max(0, Number(st.price) || 0), mockup: st.mockup || null,
+      sizes: sortSizes(st.sizes).map(z => {
+        const o = { size: z.size, stock: Math.max(0, Math.round(Number(z.stock)) || 0) };
+        if (z.price != null && z.price !== '' && Number(z.price) !== Number(st.price)) o.price = Math.max(0, Number(z.price) || 0);
+        return o;
+      }) })),
+  };
+  f.saving = true; f.err = ''; renderSheet();
+  const ref = { id: f.id || 'd' + Date.now().toString(36) + uid() };
+  try {
+    if (f.id) { clearTimeout(saveTimers.get(f.id)); pending.delete(f.id); }
+    const saved = await queueWrite(ref.id, () => api('PUT', '/api/designs/' + ref.id, doc), 'save the design');
+    const keep = new Set(assetIds(doc));
+    cleanupAssets(f.uploaded.filter(id => !keep.has(id)));
+    f.uploaded = []; f.orig = [...keep];
+    form = null; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = '';
+    view = { name: 'design', id: ref.id };
+    designs = designs.some(d => d.id === ref.id) ? designs.map(d => d.id === ref.id ? saved : d) : [...designs, saved];
+    saveCache();
+    render(); toast('Design saved');
+  } catch (e) {
+    if (form === f) { f.saving = false; f.err = errText(e, 'save the design'); renderSheet(); }
+  }
+}
+async function deleteDesign() {
+  const f = form;
+  if (!f.armed) { f.armed = true; renderSheet(); return; }
+  try {
+    await queueWrite(f.id, () => api('DELETE', '/api/designs/' + f.id), 'delete the design');
+    cleanupAssets(f.uploaded.filter(id => !f.orig.includes(id)));
+    pending.delete(f.id);
+    designs = designs.filter(d => d.id !== f.id); saveCache();
+    form = null; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = '';
+    view = { name: 'list' }; render(); toast('Design deleted');
+  } catch (e) { if (form === f) { f.armed = false; f.err = errText(e, 'delete the design'); renderSheet(); } }
+}
+
+/* ---------- Events ---------- */
+$('#newBtn').addEventListener('click', () => openEditor(null));
+$('#cartbar').addEventListener('click', e => {
+  if (e.target.closest('[data-act="checkout"]')) { view = { name: 'cart' }; render(); window.scrollTo(0, 0); }
+  else if (e.target.closest('[data-act="clearcart"]')) { cart = []; saveCart(); render(); toast('Sale cancelled'); }
+});
+$('#tabbar').addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]'); if (!t) return;
+  view = { name: t.dataset.tab === 'sell' ? 'sell' : 'list' };
+  try { history.replaceState(null, '', '#' + t.dataset.tab); } catch {}
+  render(); window.scrollTo(0, 0);
+});
+$('#app').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.open) { view = { name: 'design', id: t.dataset.open }; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.img) { view.img = t.dataset.img; render(); return; }
+  if (t.dataset.step) {
+    const d = designs.find(x => x.id === view.id); if (!d) return;
+    const st = stylesOf(d).find(s => s.id === t.dataset.style); const z = st && st.sizes.find(x => x.size === t.dataset.size);
+    if (z) setStock(d.id, st.id, z.size, (Number(z.stock) || 0) + Number(t.dataset.step));
+    return;
+  }
+  if (t.dataset.sell) { view = { name: 'sell-design', id: t.dataset.sell }; render(); window.scrollTo(0, 0); return; }
+  if (t.dataset.add) { addToCart(view.id, t.dataset.style, t.dataset.add); return; }
+  if (t.dataset.cq) {
+    const l = cartLines()[+t.dataset.i]; if (!l) return;
+    const c = cart.find(x => x.designId === l.designId && x.styleId === l.styleId && x.size === l.size);
+    c.qty += +t.dataset.cq; if (c.qty <= 0) cart = cart.filter(x => x !== c);
+    saveCart(); render(); return;
+  }
+  if (t.dataset.pay) { recordSale(t.dataset.pay); return; }
+  if (t.dataset.void) { voidSale(t.dataset.void); return; }
+  const a = t.dataset.act;
+  if (a === 'sellhome') { view = { name: 'sell' }; render(); window.scrollTo(0, 0); }
+  else if (a === 'clearcart') { cart = []; saveCart(); view = { name: 'sell' }; render(); toast('Sale cancelled'); }
+  else if (a === 'home') { view = { name: 'list' }; render(); }
+  else if (a === 'logout') { fetch('/api/logout', { method: 'POST' }).catch(() => {}); setSignedIn(false); }
+  else if (a === 'new') openEditor(null);
+  else if (a === 'edit') { const d = designs.find(x => x.id === view.id); if (d) openEditor(d); }
+});
+$('#app').addEventListener('change', e => {
+  const i = e.target; if (!i.matches('input[data-size]')) return;
+  const q = queuedDelta(view.id).get(keyOf(i.dataset.style, i.dataset.size)) || 0;
+  setStock(view.id, i.dataset.style, i.dataset.size, (Number(i.value) || 0) + q);
+});
+$('#app').addEventListener('focusout', () => setTimeout(() => { if (renderDeferred && !document.activeElement?.matches('#app input')) render(); }, 0));
+
+const sheet = $('#sheet');
+sheet.addEventListener('input', e => {
+  const i = e.target; if (!form) return;
+  const st = i.dataset.style ? form.styles.find(s => s.id === i.dataset.style) : null;
+  if (i.dataset.f === 'name') form.name = i.value;
+  else if (i.dataset.sf && st) st[i.dataset.sf] = i.value;
+  else if (i.dataset.sq && st) { const z = st.sizes.find(x => x.size === i.dataset.sq); if (z) z.stock = i.value; }
+  else if (i.dataset.szp && st) { const z = st.sizes.find(x => x.size === i.dataset.szp); if (z) z.price = i.value; }
+  else if (i.dataset.cs) form.customSize[i.dataset.cs] = i.value;
+  if (form.err) { form.err = ''; const er = sheet.querySelector('.err'); if (er) er.textContent = ''; }
+});
+sheet.addEventListener('change', e => {
+  const i = e.target;
+  if (i.dataset.up && i.files && i.files[0]) { const file = i.files[0]; i.value = ''; handleUpload(i.dataset.up, file); }
+});
+sheet.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.dataset.cs) { e.preventDefault(); sheet.querySelector(`[data-addsize="${e.target.dataset.cs}"]`)?.click(); }
+});
+sheet.addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t || !form) return;
+  const st = t.dataset.style ? form.styles.find(s => s.id === t.dataset.style) : null;
+  if (t.dataset.preset) { addStyle(STYLE_PRESETS[+t.dataset.preset]); return; }
+  if (t.dataset.rmStyle) { form.styles = form.styles.filter(s => s.id !== t.dataset.rmStyle); renderSheet(); return; }
+  if (t.dataset.tsize && st) {
+    const s = t.dataset.tsize;
+    if (st.sizes.some(z => z.size === s)) st.sizes = st.sizes.filter(z => z.size !== s); else st.sizes.push({ size: s, stock: 0 });
+    renderSheet(); return;
+  }
+  if (t.dataset.addsize) {
+    const s2 = form.styles.find(s => s.id === t.dataset.addsize); const v = (form.customSize[t.dataset.addsize] || '').trim();
+    if (s2 && v && !s2.sizes.some(z => z.size.toLowerCase() === v.toLowerCase())) s2.sizes.push({ size: v.slice(0, 20), stock: 0 });
+    form.customSize[t.dataset.addsize] = ''; renderSheet(); return;
+  }
+  const a = t.dataset.act;
+  if (a === 'cancel') closeEditor();
+  else if (a === 'save') saveForm();
+  else if (a === 'delete') deleteDesign();
+  if (a !== 'delete' && form && form.armed) { form.armed = false; renderSheet(); }
+});
+
+/* ---------- Sign in ---------- */
+function renderLogin() {
+  $('#app').innerHTML = `<form class="login" id="loginForm" novalidate>
+    <h2>Sign in</h2><p>Enter the merch password to see stock and record sales.</p>
+    <label class="vh" for="pw">Password</label>
+    <input class="txt" type="password" id="pw" autocomplete="current-password" placeholder="Password" style="height:52px;font-size:18px">
+    <button class="btn primary" type="submit">Sign in</button>
+    <p class="err" id="loginErr" role="alert"></p></form>`;
+}
+$('#app').addEventListener('submit', async e => {
+  if (e.target.id !== 'loginForm') return;
+  e.preventDefault();
+  const pw = $('#pw').value, err = $('#loginErr'), btn = e.target.querySelector('button');
+  if (!pw) { err.textContent = 'Type the password first.'; return; }
+  btn.disabled = true; err.textContent = '';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { err.textContent = data.error || 'Sign in failed.'; btn.disabled = false; return; }
+    setSignedIn(true); await refresh(); sync();
+  } catch { err.textContent = "Can't reach the server. Check your signal."; btn.disabled = false; }
+});
+
+/* ---------- Boot ---------- */
+async function boot() {
+  const cached = ls.get(LS_D, null);
+  if (cached) { designs = cached.designs || []; sales = cached.sales || []; loaded = true; }
+  if (ls.get(LS_AUTH, false)) signedIn = true; // trust the last sign-in so the table works with no signal
+  render();
+  try { await api('GET', '/api/me'); setSignedIn(true); }
+  catch (e) { if (e.code === 'auth') return; if (!signedIn) staleNote = "Can't reach the server yet. Check your signal."; }
+  render();
+  await refresh();
+  sync();
+}
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+boot();
+</script>
+</body>
+</html>
