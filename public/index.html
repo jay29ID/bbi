@@ -222,12 +222,13 @@ body.has-tabs .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 .salelist { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
 .sale { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
 .sale + .sale { border-top: 1px solid var(--line); }
-.sale .when { font-family: var(--f-data); font-weight: 600; color: var(--muted); width: 58px; flex: none; font-variant-numeric: tabular-nums; }
+.sale .when { font-family: var(--f-data); font-weight: 600; color: var(--muted); width: 64px; flex: none; font-variant-numeric: tabular-nums; }
 .sale .what { flex: 1; min-width: 0; font-size: 14px; overflow-wrap: anywhere; }
 .sale .what .chip { margin-left: 4px; }
 .sale .amt { font-family: var(--f-data); font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; text-align: right; }
 .sale .amt small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
-.sale .btn { min-height: 36px; padding: 0 12px; font-size: 14px; }
+.sale .btn { min-height: 40px; padding: 0 12px; font-size: 14px; flex: none; }
+.sale .when { line-height: 1.2; }
 .cart-line { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
 .cart-line + .cart-line { border-top: 1px solid var(--line); }
 .cart-line .what { flex: 1; min-width: 0; }
@@ -417,7 +418,7 @@ function renderChrome(selling) {
   const cb = $('#cartbar'), lines = cartLines();
   if (on && lines.length && view.name !== 'cart' && selling) {
     const n = lines.reduce((a, l) => a + l.qty, 0), tot = lines.reduce((a, l) => a + l.qty * l.price, 0);
-    cb.innerHTML = `<div class="cartbar-in"><span class="sum">${n} item${n > 1 ? 's' : ''}<b>${money(tot)}</b></span><button class="btn" type="button" data-act="checkout">Take payment</button></div>`;
+    cb.innerHTML = `<div class="cartbar-in"><span class="sum">${n} item${n > 1 ? 's' : ''}<b>${money(tot)}</b></span><button class="btn ghost" type="button" data-act="clearcart" style="background:transparent;border-color:transparent;color:inherit">Cancel</button><button class="btn" type="button" data-act="checkout">Take payment</button></div>`;
     cb.hidden = false;
   } else { cb.hidden = true; cb.innerHTML = ''; }
 }
@@ -449,21 +450,26 @@ function renderSell() {
         <div class="card-meta">${tot ? tot + ' left' : 'Sold out'}</div></div></button>`;
   }).join('');
   const today = new Date().toDateString();
-  const list = allSales().filter(s => new Date(s.at).toDateString() === today);
+  const everything = allSales();
+  const list = everything.filter(s => new Date(s.at).toDateString() === today);
+  const earlier = everything.filter(s => new Date(s.at).toDateString() !== today).slice(0, 40);
   const total = list.reduce((a, s) => a + (Number(s.total) || 0), 0);
   const cash = list.filter(s => s.payment === 'cash').reduce((a, s) => a + (Number(s.total) || 0), 0);
-  const rows = list.slice(0, 40).map(s => `<div class="sale">
-      <span class="when">${esc(timeOf(s.at))}</span>
+  const row = (s, showDay) => `<div class="sale">
+      <span class="when">${showDay ? esc(dayOf(s.at)) + '<br>' : ''}${esc(timeOf(s.at))}</span>
       <span class="what">${esc(itemsText(s.items || []))}${s.waiting ? '<span class="chip low">Waiting for signal</span>' : ''}</span>
       <span class="amt">${money(s.total)}<small>${esc(s.payment)}</small></span>
-      ${canWrite ? `<button class="btn ${voidArmed === s.id ? 'danger armed' : 'ghost'}" type="button" data-void="${esc(s.id)}">${voidArmed === s.id ? 'Undo?' : 'Undo'}</button>` : ''}
-    </div>`).join('');
+      ${canWrite ? `<button class="btn ${voidArmed === s.id ? 'danger armed' : 'danger'}" type="button" data-void="${esc(s.id)}" aria-label="Cancel this sale">${voidArmed === s.id ? 'Tap to confirm' : 'Cancel'}</button>` : ''}
+    </div>`;
+  const rows = list.slice(0, 60).map(s => row(s, false)).join('');
   app.innerHTML = note + (items.length ? `<div class="sell-grid">${cards}</div>` :
       `<div class="empty"><h2>Nothing to sell yet</h2><p>Add designs with sizes on the Stock tab first.</p></div>`) +
     `<div class="h-sec"><h2>Today's sales</h2><span>${list.length} sale${list.length === 1 ? '' : 's'} · ${money(total)}${list.length ? ` · cash ${money(cash)} · card ${money(total - cash)}` : ''}</span></div>
-     ${rows ? `<div class="salelist">${rows}</div>` : '<p class="sec-help">Sales you record show up here. Tap an item above to start.</p>'}
+     ${rows ? `<p class="sec-help">Tap Cancel on a sale to remove it and put its items back in stock.</p><div class="salelist">${rows}</div>` : '<p class="sec-help">Sales you record show up here. Tap an item above to start.</p>'}
+     ${earlier.length ? `<div class="h-sec" style="margin-top:22px"><h2>Earlier this week</h2></div><div class="salelist">${earlier.map(s => row(s, true)).join('')}</div>` : ''}
      ${syncProblem ? `<p class="sec-help">${esc(syncProblem)}</p>` : ''}`;
 }
+function dayOf(ts) { try { return new Date(ts).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }); } catch { return ''; } }
 function renderSellDesign(d) {
   const app = $('#app'), img = heroImg(d);
   const styles = displayStyles(d).filter(st => (st.sizes || []).length);
@@ -493,7 +499,7 @@ function renderCart() {
     <div class="cart-total"><span>Total</span><b>${money(tot)}</b></div>
     <div class="pay"><button class="btn cash" type="button" data-pay="cash">Cash</button><button class="btn primary" type="button" data-pay="card">Card</button></div>
     <p class="sec-help">Tap how they paid to record the sale. Take card payments on your card reader as usual.</p>
-    <button class="btn ghost" type="button" data-act="clearcart">Clear this sale</button>`;
+    <button class="btn danger" type="button" data-act="clearcart">Cancel this sale</button>`;
 }
 
 function addToCart(designId, styleId, size) {
@@ -513,7 +519,7 @@ function recordSale(payment) {
   sync();
 }
 function voidSale(id) {
-  if (voidArmed !== id) { voidArmed = id; render(); setTimeout(() => { if (voidArmed === id) { voidArmed = null; render(); } }, 4000); return; }
+  if (voidArmed !== id) { voidArmed = id; render(); setTimeout(() => { if (voidArmed === id) { voidArmed = null; render(); } }, 5000); return; }
   voidArmed = null;
   const qi = queue.findIndex(op => op.kind === 'sale' && op.sale.id === id);
   if (qi >= 0 && !queue[qi].saleDone && !queue[qi].stockDone) queue.splice(qi, 1);
@@ -522,7 +528,7 @@ function voidSale(id) {
     if (!s) return;
     queue.push({ kind: 'void', sale: { id: s.id, items: s.items }, saleDone: false, stockDone: false });
   }
-  saveQ(); render(); toast('Sale undone, stock put back'); sync();
+  saveQ(); render(); toast('Sale cancelled, items back in stock'); sync();
 }
 
 /* ---------- Sync ---------- */
@@ -549,7 +555,7 @@ async function refresh() {
   if (refreshing || !signedIn) return;
   refreshing = true;
   try {
-    const [ds, ss] = await Promise.all([api('GET', '/api/designs'), api('GET', '/api/sales')]);
+    const [ds, ss] = await Promise.all([api('GET', '/api/designs'), api('GET', '/api/sales?since=' + (Date.now() - 7 * 864e5))]);
     designs = ds; sales = ss; loaded = true; staleNote = '';
     saveCache();
   } catch (e) {
@@ -828,7 +834,10 @@ async function deleteDesign() {
 
 /* ---------- Events ---------- */
 $('#newBtn').addEventListener('click', () => openEditor(null));
-$('#cartbar').addEventListener('click', e => { if (e.target.closest('[data-act="checkout"]')) { view = { name: 'cart' }; render(); window.scrollTo(0, 0); } });
+$('#cartbar').addEventListener('click', e => {
+  if (e.target.closest('[data-act="checkout"]')) { view = { name: 'cart' }; render(); window.scrollTo(0, 0); }
+  else if (e.target.closest('[data-act="clearcart"]')) { cart = []; saveCart(); render(); toast('Sale cancelled'); }
+});
 $('#tabbar').addEventListener('click', e => {
   const t = e.target.closest('[data-tab]'); if (!t) return;
   view = { name: t.dataset.tab === 'sell' ? 'sell' : 'list' };
@@ -857,7 +866,7 @@ $('#app').addEventListener('click', e => {
   if (t.dataset.void) { voidSale(t.dataset.void); return; }
   const a = t.dataset.act;
   if (a === 'sellhome') { view = { name: 'sell' }; render(); window.scrollTo(0, 0); }
-  else if (a === 'clearcart') { cart = []; saveCart(); view = { name: 'sell' }; render(); }
+  else if (a === 'clearcart') { cart = []; saveCart(); view = { name: 'sell' }; render(); toast('Sale cancelled'); }
   else if (a === 'home') { view = { name: 'list' }; render(); }
   else if (a === 'logout') { fetch('/api/logout', { method: 'POST' }).catch(() => {}); setSignedIn(false); }
   else if (a === 'new') openEditor(null);
