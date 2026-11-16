@@ -1,5 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BBI Merch Tracker</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#18201B">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BBI Merch">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;800&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
@@ -40,6 +51,13 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+html, body { margin: 0; }
+img { max-width: 100%; }
+body { padding-top: env(safe-area-inset-top, 0px); }
+.login { max-width: 360px; margin: 48px auto; display: flex; flex-direction: column; gap: 12px; }
+.login h2 { margin: 0; font-family: var(--f-display); font-weight: 800; font-size: 34px; text-transform: uppercase; }
+.login p { margin: 0; color: var(--muted); }
+.login .err { color: var(--out); min-height: 1.4em; }
 [hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.45; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
@@ -222,7 +240,8 @@ body.has-tabs .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 .pay .btn { min-height: 64px; border-radius: 14px; font-size: 20px; }
 .pay .btn.cash { background: var(--ok); border-color: var(--ok); color: var(--surface); }
 </style>
-
+</head>
+<body>
 <header class="top"><div class="top-in">
   <div class="brand"><b>BBI Merch</b><span>Stock tracker</span></div>
   <div class="spacer"></div>
@@ -252,7 +271,10 @@ const STYLE_PRESETS = [
 ];
 const LOW = 3;
 
-let db = null, assets = null, user = null, canWrite = true;
+let signedIn = null, canWrite = true;
+const assets = true;
+const LS_D = 'bbi.data.v1', LS_AUTH = 'bbi.signedin';
+const dirty = new Map();
 let designs = [], loaded = false, staleNote = '';
 const pending = new Map();      // designId -> styles awaiting save
 const saveTimers = new Map();
@@ -269,12 +291,12 @@ const ls = {
 };
 let queue = ls.get(LS_Q, []);   // [{kind:'sale'|'void', sale, saleDone, stockDone}]
 let cart = ls.get(LS_CART, []); // [{designId, styleId, size, qty}]
-let sales = [], salesLoaded = false, designsFresh = false, syncing = false, syncProblem = '';
+let sales = [], syncing = false, syncProblem = '';
 let voidArmed = null;
 const saveQ = () => ls.set(LS_Q, queue);
 const saveCart = () => ls.set(LS_CART, cart);
 const withTimeout = (p, ms = 12000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), ms))]);
-const keyOf = (s, z) => s + '|' + z;
+const keyOf = (s, z) => s + '\u0000' + z;
 function queuedDelta(designId) {
   const m = new Map();
   for (const op of queue) {
@@ -304,7 +326,7 @@ function cartLines() {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Math.random().toString(36).slice(2, 10);
-const blob = id => id ? '/_blob/' + id : '';
+const blob = id => id ? '/img/' + id : '';
 const money = n => { n = Number(n) || 0; return '$' + (n % 1 ? n.toFixed(2) : n); };
 const slug = s => String(s).replace(/[^a-z0-9]/gi, '_');
 const sizeRank = s => { const i = SIZES.indexOf(s); return i < 0 ? 99 : i; };
@@ -342,13 +364,22 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600);
 }
 function errText(e, what) {
-  const c = e && e.code;
-  if (c === 'quota_exceeded' || c === 'quota_or_state') return `Couldn't ${what}: storage is full. Remove old designs or images, then try again.`;
-  if (c === 'too_large') return `That image is too big. Pick one under 20 MB.`;
-  if (c === 'unsupported_type') return `That file type isn't supported. Use a JPG, PNG or WebP image.`;
-  if (c === 'invalid_argument' || c === 'not_granted') return `Couldn't ${what}: this account can only view the stock.`;
-  return `Couldn't ${what}. Check your connection and try again.`;
+  if (e && e.code === 'http' && e.message) return e.message;
+  if (e && e.code === 'auth') return 'Sign in again to keep going.';
+  return `Couldn't ${what}. Check your signal and try again.`;
 }
+async function api(method, path, body, raw) {
+  const opt = { method, headers: {}, credentials: 'same-origin' };
+  if (raw) { opt.body = raw.body; opt.headers['Content-Type'] = raw.type; }
+  else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
+  let r;
+  try { r = await withTimeout(fetch(path, opt), 15000); } catch { throw { code: 'network' }; }
+  if (r.status === 401) { setSignedIn(false); throw { code: 'auth', status: 401 }; }
+  let data = null; try { data = await r.json(); } catch {}
+  if (!r.ok) throw { code: 'http', status: r.status, message: data && data.error };
+  return data;
+}
+function setSignedIn(v) { const was = signedIn; signedIn = v; ls.set(LS_AUTH, !!v); if (was !== v) render(); }
 function queueWrite(id, fn, what) {
   const p = (writeQ.get(id) || Promise.resolve()).then(fn).catch(e => { if (what) toast(errText(e, what)); throw e; });
   writeQ.set(id, p.catch(() => {}));
@@ -359,8 +390,9 @@ function queueWrite(id, fn, what) {
 function render() {
   if (document.activeElement && document.activeElement.matches('#app input')) { renderDeferred = true; return; }
   renderDeferred = false;
+  if (signedIn === false) { renderChrome(false); return renderLogin(); }
   const selling = ['sell', 'sell-design', 'cart'].includes(view.name);
-  $('#newBtn').hidden = !(db && canWrite) || selling;
+  $('#newBtn').hidden = !(signedIn && canWrite) || selling;
   renderChrome(selling);
   if (view.name === 'design' || view.name === 'sell-design') {
     const d = designs.find(x => x.id === view.id);
@@ -373,7 +405,7 @@ function render() {
 }
 
 function renderChrome(selling) {
-  const on = !!db;
+  const on = !!signedIn;
   document.body.classList.toggle('has-tabs', on);
   $('#tabbar').hidden = !on;
   for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-current', (t.dataset.tab === 'sell') === selling ? 'page' : 'false');
@@ -404,7 +436,6 @@ function allSales() {
 function renderSell() {
   const app = $('#app');
   const note = staleNote ? `<div class="note">${esc(staleNote)}</div>` : '';
-  if (!db) { renderList(); return; }
   if (!loaded) { app.innerHTML = note + `<div class="empty"><h2>Loading</h2><p>Getting your merch list.</p></div>`; return; }
   const items = designs.filter(d => stylesOf(d).some(st => (st.sizes || []).length));
   const cards = items.map(d => {
@@ -495,53 +526,39 @@ function voidSale(id) {
 }
 
 /* ---------- Sync ---------- */
-async function applyStock(op) {
-  const sign = op.kind === 'sale' ? -1 : 1, marker = (op.kind === 'void' ? 'void:' : '') + op.sale.id;
-  const ids = [...new Set(op.sale.items.map(it => it.designId))];
-  for (const id of ids) {
-    await queueWrite(id, async () => {
-      const cur = designs.find(x => x.id === id); if (!cur) return;
-      const applied = cur.lastSaleIds || [];
-      if (applied.includes(marker)) return;
-      const prev = pending.get(id);
-      const styles = structuredClone(stylesOf(cur));
-      for (const it of op.sale.items) {
-        if (it.designId !== id) continue;
-        const z = styles.find(s => s.id === it.styleId)?.sizes.find(x => x.size === it.size);
-        if (z) z.stock = Math.max(0, (Number(z.stock) || 0) + sign * it.qty);
-      }
-      clearTimeout(saveTimers.get(id)); pending.delete(id);
-      try {
-        await withTimeout(db.collection('designs').doc(id).update({ styles, lastSaleIds: [...applied, marker].slice(-80), updatedAt: Date.now() }));
-      } catch (e) { if (prev && !pending.has(id)) { pending.set(id, prev); saveTimers.set(id, setTimeout(() => flush(id), 700)); } throw e; }
-    });
-  }
-}
+// The server records each sale once by its id, so resending after a dropped connection is safe.
 async function sync() {
-  if (syncing || !db || !queue.length) return;
-  syncing = true;
+  if (syncing || !signedIn || !queue.length) return;
+  syncing = true; let did = false;
   try {
     while (queue.length) {
       const op = queue[0];
-      if (!op.saleDone) {
-        const ref = db.collection('sales').doc(op.sale.id);
-        await withTimeout(op.kind === 'sale' ? ref.set(op.sale) : ref.delete());
-        op.saleDone = true; saveQ();
-      }
-      if (!op.stockDone) {
-        if (!designsFresh) break;
-        await applyStock(op);
-        op.stockDone = true;
-      }
-      queue.shift(); saveQ(); render();
+      if (op.kind === 'sale') await api('POST', '/api/sales', op.sale);
+      else await api('POST', `/api/sales/${encodeURIComponent(op.sale.id)}/void`);
+      queue.shift(); saveQ(); did = true;
     }
     syncProblem = '';
   } catch (e) {
-    syncProblem = e && (e.code === 'invalid_argument' || e.code === 'not_granted')
-      ? "Sales can't be saved from this account. Sign in with the band's account."
-      : (e && e.code === 'quota_exceeded') ? 'The sales log is full. Contact whoever set up the app.' : '';
-  } finally { syncing = false; render(); }
+    if (e.code === 'http' && e.status === 400) { queue.shift(); saveQ(); syncProblem = e.message || 'One sale could not be saved and was skipped.'; }
+    else syncProblem = '';
+  } finally { syncing = false; if (did) refresh(); else render(); }
 }
+function saveCache() { ls.set(LS_D, { designs, sales, at: Date.now() }); }
+let refreshing = false;
+async function refresh() {
+  if (refreshing || !signedIn) return;
+  refreshing = true;
+  try {
+    const [ds, ss] = await Promise.all([api('GET', '/api/designs'), api('GET', '/api/sales')]);
+    designs = ds; sales = ss; loaded = true; staleNote = '';
+    saveCache();
+  } catch (e) {
+    if (e.code !== 'auth') staleNote = loaded ? 'No signal right now. Showing the last counts this phone saw. Sales still get saved.' : "Can't reach the server yet. Check your signal.";
+  } finally { refreshing = false; render(); }
+}
+window.addEventListener('online', () => refresh());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); sync(); } });
+setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 20000);
 window.addEventListener('online', () => { render(); sync(); });
 window.addEventListener('offline', () => render());
 setInterval(() => { if (queue.length) sync(); }, 15000);
@@ -549,10 +566,6 @@ setInterval(() => { if (queue.length) sync(); }, 15000);
 function renderList() {
   const app = $('#app');
   const note = staleNote ? `<div class="note">${esc(staleNote)}</div>` : '';
-  if (!db) {
-    app.innerHTML = `<div class="empty"><h2>Can't load stock</h2><p>Open this page signed in to Claude to see and edit the merch stock.</p></div>`;
-    return;
-  }
   if (!loaded) { app.innerHTML = note + `<div class="empty"><h2>Loading</h2><p>Getting your merch list.</p></div>`; return; }
   if (!designs.length) {
     app.innerHTML = note + `<div class="empty"><h2>No designs yet</h2>
@@ -574,7 +587,8 @@ function renderList() {
       </div></button>`;
   }).join('');
   app.innerHTML = note + `<div class="summary"><span><b>${designs.length}</b> designs</span><span><b>${units}</b> items in stock</span>
-    <span><b>${low}</b> sizes low</span><span><b>${out}</b> sold out</span></div><div class="grid">${cards}</div>`;
+    <span><b>${low}</b> sizes low</span><span><b>${out}</b> sold out</span></div><div class="grid">${cards}</div>
+    <p style="margin-top:28px"><button class="btn ghost" type="button" data-act="logout">Sign out</button></p>`;
 }
 
 function renderDesign(d) {
@@ -627,15 +641,25 @@ function setStock(designId, styleId, size, val) {
   const z = (st.sizes || []).find(x => x.size === size); if (!z) return;
   z.stock = Math.max(0, Math.round(Number(val)) || 0);
   pending.set(designId, styles);
+  if (!dirty.has(designId)) dirty.set(designId, new Set());
+  dirty.get(designId).add(keyOf(styleId, size));
   render();
   clearTimeout(saveTimers.get(designId));
   saveTimers.set(designId, setTimeout(() => flush(designId), 700));
 }
 function flush(id) {
-  const styles = pending.get(id); if (!styles) return;
+  const styles = pending.get(id), keys = dirty.get(id); if (!styles || !keys) return;
+  dirty.delete(id);
   queueWrite(id, async () => {
-    await db.collection('designs').doc(id).update({ styles, updatedAt: Date.now() });
+    let doc = null;
+    for (const k of keys) {
+      const i = k.indexOf('\u0000'), styleId = k.slice(0, i), size = k.slice(i + 1);
+      const z = styles.find(s => s.id === styleId)?.sizes.find(x => x.size === size);
+      if (z) doc = await api('POST', `/api/designs/${encodeURIComponent(id)}/stock`, { styleId, size, stock: z.stock });
+    }
+    if (doc) designs = designs.map(d => d.id === id ? doc : d);
     if (pending.get(id) === styles) pending.delete(id);
+    saveCache(); render();
   }, 'save the stock count').catch(() => { if (pending.get(id) === styles) { pending.delete(id); render(); } });
 }
 
@@ -663,7 +687,7 @@ function closeEditor() {
   form = null; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = '';
   render();
 }
-function cleanupAssets(ids) { if (assets) for (const id of ids) assets.delete(id).catch(() => {}); }
+function cleanupAssets(ids) { for (const id of ids) api('DELETE', '/api/images/' + encodeURIComponent(id)).catch(() => {}); }
 
 function upTile(key, id, title, sub) {
   const busy = form.busy[key];
@@ -744,7 +768,7 @@ async function handleUpload(key, file) {
   try {
     const b = await prepImage(file);
     const type = b.type || file.type || 'image/jpeg';
-    const r = await assets.upload(b, { type });
+    const r = await api('POST', '/api/images', undefined, { body: b, type });
     if (form !== f) { cleanupAssets([r.id]); return; }
     f.uploaded.push(r.id);
     if (key === 'graphic' || key === 'mockup') f[key] = r.id;
@@ -765,7 +789,6 @@ async function saveForm() {
   if (unnamed) { f.err = 'Every style needs a name, like "Hoodie".'; renderSheet(); $('#sn-' + unnamed.id)?.focus(); return; }
   const doc = {
     name: f.name, graphic: f.graphic, mockup: f.mockup, createdAt: f.createdAt, updatedAt: Date.now(),
-    lastSaleIds: (f.id && designs.find(d => d.id === f.id)?.lastSaleIds) || [],
     styles: f.styles.map(st => ({ id: st.id, name: st.name, price: Math.max(0, Number(st.price) || 0), mockup: st.mockup || null,
       sizes: sortSizes(st.sizes).map(z => {
         const o = { size: z.size, stock: Math.max(0, Math.round(Number(z.stock)) || 0) };
@@ -774,16 +797,17 @@ async function saveForm() {
       }) })),
   };
   f.saving = true; f.err = ''; renderSheet();
-  const ref = f.id ? db.collection('designs').doc(f.id) : db.collection('designs').doc();
+  const ref = { id: f.id || 'd' + Date.now().toString(36) + uid() };
   try {
     if (f.id) { clearTimeout(saveTimers.get(f.id)); pending.delete(f.id); }
-    await queueWrite(ref.id, () => ref.set(doc), 'save the design');
+    const saved = await queueWrite(ref.id, () => api('PUT', '/api/designs/' + ref.id, doc), 'save the design');
     const keep = new Set(assetIds(doc));
-    cleanupAssets([...new Set([...f.orig, ...f.uploaded])].filter(id => !keep.has(id)));
+    cleanupAssets(f.uploaded.filter(id => !keep.has(id)));
     f.uploaded = []; f.orig = [...keep];
     form = null; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = '';
     view = { name: 'design', id: ref.id };
-    if (!designs.find(d => d.id === ref.id)) designs = [...designs, { id: ref.id, ...doc }];
+    designs = designs.some(d => d.id === ref.id) ? designs.map(d => d.id === ref.id ? saved : d) : [...designs, saved];
+    saveCache();
     render(); toast('Design saved');
   } catch (e) {
     if (form === f) { f.saving = false; f.err = errText(e, 'save the design'); renderSheet(); }
@@ -793,10 +817,10 @@ async function deleteDesign() {
   const f = form;
   if (!f.armed) { f.armed = true; renderSheet(); return; }
   try {
-    await queueWrite(f.id, () => db.collection('designs').doc(f.id).delete(), 'delete the design');
-    cleanupAssets([...new Set([...f.orig, ...f.uploaded])]);
+    await queueWrite(f.id, () => api('DELETE', '/api/designs/' + f.id), 'delete the design');
+    cleanupAssets(f.uploaded.filter(id => !f.orig.includes(id)));
     pending.delete(f.id);
-    designs = designs.filter(d => d.id !== f.id);
+    designs = designs.filter(d => d.id !== f.id); saveCache();
     form = null; $('#sheet').hidden = true; $('#sheet').innerHTML = ''; document.body.style.overflow = '';
     view = { name: 'list' }; render(); toast('Design deleted');
   } catch (e) { if (form === f) { f.armed = false; f.err = errText(e, 'delete the design'); renderSheet(); } }
@@ -835,6 +859,7 @@ $('#app').addEventListener('click', e => {
   if (a === 'sellhome') { view = { name: 'sell' }; render(); window.scrollTo(0, 0); }
   else if (a === 'clearcart') { cart = []; saveCart(); view = { name: 'sell' }; render(); }
   else if (a === 'home') { view = { name: 'list' }; render(); }
+  else if (a === 'logout') { fetch('/api/logout', { method: 'POST' }).catch(() => {}); setSignedIn(false); }
   else if (a === 'new') openEditor(null);
   else if (a === 'edit') { const d = designs.find(x => x.id === view.id); if (d) openEditor(d); }
 });
@@ -885,32 +910,43 @@ sheet.addEventListener('click', e => {
   if (a !== 'delete' && form && form.armed) { form.armed = false; renderSheet(); }
 });
 
+/* ---------- Sign in ---------- */
+function renderLogin() {
+  $('#app').innerHTML = `<form class="login" id="loginForm" novalidate>
+    <h2>Sign in</h2><p>Enter the merch password to see stock and record sales.</p>
+    <label class="vh" for="pw">Password</label>
+    <input class="txt" type="password" id="pw" autocomplete="current-password" placeholder="Password" style="height:52px;font-size:18px">
+    <button class="btn primary" type="submit">Sign in</button>
+    <p class="err" id="loginErr" role="alert"></p></form>`;
+}
+$('#app').addEventListener('submit', async e => {
+  if (e.target.id !== 'loginForm') return;
+  e.preventDefault();
+  const pw = $('#pw').value, err = $('#loginErr'), btn = e.target.querySelector('button');
+  if (!pw) { err.textContent = 'Type the password first.'; return; }
+  btn.disabled = true; err.textContent = '';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { err.textContent = data.error || 'Sign in failed.'; btn.disabled = false; return; }
+    setSignedIn(true); await refresh(); sync();
+  } catch { err.textContent = "Can't reach the server. Check your signal."; btn.disabled = false; }
+});
+
 /* ---------- Boot ---------- */
 async function boot() {
-  const C = window.claude;
-  if (!C || !C.use) { db = null; render(); return; }
-  [db, user, assets] = await Promise.all([C.use('db'), C.use('user'), C.use('assets')]);
-  if (user) { try { const w = await user.can('data.write'); if (w === false) canWrite = false; } catch {} }
-  if (!db) { render(); return; }
+  const cached = ls.get(LS_D, null);
+  if (cached) { designs = cached.designs || []; sales = cached.sales || []; loaded = true; }
+  if (ls.get(LS_AUTH, false)) signedIn = true; // trust the last sign-in so the table works with no signal
   render();
-  const timer = setTimeout(() => {
-    staleNote = loaded ? 'No signal right now. Counts may be out of date until the connection comes back.' : "Can't reach the stock list yet. Check your signal; it will load by itself once connected.";
-    render();
-  }, 10000);
-  db.collection('designs').orderBy('createdAt').onSnapshot(snap => {
-    designs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    loaded = true;
-    if (!snap.metadata.fromCache) { clearTimeout(timer); staleNote = ''; if (!designsFresh) { designsFresh = true; setTimeout(sync, 0); } }
-    render();
-  }, err => {
-    clearTimeout(timer); loaded = true;
-    staleNote = err.code === 'revoked' ? 'This page lost access to the stock list.' : 'The stock list stopped updating. Reload the page to reconnect.';
-    render();
-  });
-  db.collection('sales').orderBy('at', 'desc').limit(200).onSnapshot(snap => {
-    sales = snap.docs.map(d => ({ id: d.id, ...d.data() })); salesLoaded = true; render();
-  }, () => {});
+  try { await api('GET', '/api/me'); setSignedIn(true); }
+  catch (e) { if (e.code === 'auth') return; if (!signedIn) staleNote = "Can't reach the server yet. Check your signal."; }
+  render();
+  await refresh();
   sync();
 }
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 boot();
 </script>
+</body>
+</html>

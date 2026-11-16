@@ -1,0 +1,9 @@
+{
+  "name": "BBI Merch",
+  "short_name": "BBI Merch",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F1311",
+  "theme_color": "#18201B",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
